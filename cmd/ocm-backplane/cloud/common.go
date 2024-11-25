@@ -265,7 +265,23 @@ func (cfg *QueryConfig) getIsolatedCredentials(ocmToken string) (aws.Credentials
 		return aws.Credentials{}, fmt.Errorf("failed to fetch arn sequence: %w", err)
 	}
 	if response.StatusCode != http.StatusOK {
-		return aws.Credentials{}, fmt.Errorf("failed to fetch arn sequence: %v", response.Status)
+		defer response.Body.Close()
+
+		var resObj struct {
+			StatusCode int    `json:"statusCode"`
+			Message    string `json:"message"`
+		}
+
+		data, err := io.ReadAll(response.Body)
+		if err := json.Unmarshal(data, &resObj); err != nil {
+			return aws.Credentials{}, fmt.Errorf("unmarshilling response body: %w", err)
+		}
+
+		if err != nil {
+			return aws.Credentials{}, fmt.Errorf("reading response body: %w", err)
+		}
+
+		return aws.Credentials{}, fmt.Errorf("failed to fetch arn sequence: \n%+v", resObj)
 	}
 
 	bytes, err := io.ReadAll(response.Body)
